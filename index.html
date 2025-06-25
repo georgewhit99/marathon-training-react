@@ -266,7 +266,76 @@ Outdated design but with local storage working RunGeorge
         };
 
         // Training plan data following the provided format
-        const trainingPlan = {
+        // ---- PLAN GENERATION ----
+    function generatePlan(settings) {
+      // Algorithm: Progressive long run (starts at 8km), cutback every 4th week, taper last 3 weeks.
+      // Assigns: tempo (Tue), speed (Thu), long (Sun)
+      let plan = [];
+      let long = 8;
+      let date = new Date(settings.startDate);
+      let pTempo = settings.paceTempo;
+      let pLong = settings.paceLong;
+      let pSpeed = settings.paceSpeed;
+      let numWorkouts = settings.workoutsPerWeek;
+      for(let w=0;w<40;w++) {
+        let week = Array(7).fill(null);
+        // Long run logic
+        let isCutback = ((w+1)%4===0), isTaper = (w>=37);
+        if(isTaper) long = Math.max(13, Math.round(long*0.7));
+        else if(isCutback) long = Math.max(13, Math.round(long*0.7));
+        else long = Math.min(33, Math.round(long+1.5));
+        // Assign days: Tue(1): tempo, Thu(3): speed, Sun(6): long
+        // Optionally add Wed(2): easy for 4/wk
+        if(numWorkouts >= 3) {
+          week[1] = {
+            type: "tempo",
+            title: "Tempo Run",
+            desc: `${Math.max(4,Math.round(long/2.5))}km @ ${pTempo}/km\nTempo pace`,
+            distance: Math.max(4,Math.round(long/2.5)),
+            pace: pTempo,
+            points: 20 + Math.round(2 * Math.max(4,Math.round(long/2.5)))
+          };
+          week[3] = {
+            type: "speed",
+            title: "Speed/Interval",
+            desc: `${5+(w%3)}km @ ${pSpeed}/km\nIntervals or fartlek`,
+            distance: 5+(w%3),
+            pace: pSpeed,
+            points: 20 + Math.round(2.5*(5+(w%3)))
+          };
+          week[6] = {
+            type: "long",
+            title: "Long Run",
+            desc: `${long}km @ ${pLong}/km\nLong run pace`,
+            distance: long,
+            pace: pLong,
+            points: 30 + Math.round(long*2.8)
+          };
+        }
+        if(numWorkouts === 4) {
+          week[4] = {
+            type: "easy",
+            title: "Easy Run",
+            desc: `${Math.max(4,Math.round(long/3.5))}km @ ${plusMinutes(pLong,0.30)}/km\nEasy pace`,
+            distance: Math.max(4,Math.round(long/3.5)),
+            pace: plusMinutes(pLong,0.30),
+            points: 10 + Math.round(1.6 * Math.max(4,Math.round(long/3.5)))
+          };
+        }
+        plan.push(week);
+        date.setDate(date.getDate()+7);
+      }
+      return plan;
+    }
+    function plusMinutes(pace, plus) {
+      // pace "5:45", plus in decimal minutes
+      let [m,s] = pace.split(":").map(Number);
+      let total = m + s/60 + plus;
+      let mi = Math.floor(total);
+      let se = Math.round((total-mi)*60);
+      return `${mi}:${se<10?'0':''}${se}`;
+    }
+    const trainingPlan = {
             1: {
                 title: "Aerobic Base & Routine Building",
                 workouts: [
