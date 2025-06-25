@@ -1,0 +1,1489 @@
+Outdated design but with local storage working RunGeorge
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marathon Training Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'primary-dark': '#4A49B8',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .workout-card {
+            transition: all 0.2s ease;
+            cursor: grab;
+        }
+        .workout-card:active {
+            cursor: grabbing;
+            transform: rotate(2deg) scale(1.05);
+        }
+        .workout-card.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+        .day-slot {
+            min-height: 120px;
+            transition: background-color 0.2s ease;
+        }
+        .day-slot.drag-over {
+            background-color: rgba(93, 92, 222, 0.1);
+            border: 2px dashed rgba(93, 92, 222, 0.3);
+        }
+        .completed-workout {
+            opacity: 0.7;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-color: #059669;
+        }
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+    <div id="app" class="max-w-7xl mx-auto px-4 py-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-4xl font-bold text-primary">Marathon Training Calendar</h1>
+                <p class="text-gray-600 dark:text-gray-400">Professional training plan with flexible scheduling</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="showPaceSettings()" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-4 py-2 rounded-lg font-medium transition-colors">
+                    ⚙️ Adjust Paces
+                </button>
+                <button onclick="showProgress()" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                    📊 Progress
+                </button>
+                <button onclick="showDataManagement()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                    💾 Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Week Navigation -->
+        <div class="flex items-center justify-between mb-6 bg-white dark:bg-gray-800 rounded-xl p-4">
+            <button onclick="changeWeek(-1)" class="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-2 rounded-lg transition-colors">
+                ← Previous
+            </button>
+            <div class="text-center">
+                <h2 id="week-title" class="text-2xl font-bold text-primary">Week 1</h2>
+                <div id="week-subtitle" class="text-sm text-gray-600 dark:text-gray-400">Aerobic Base & Routine Building</div>
+            </div>
+            <button onclick="changeWeek(1)" class="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-2 rounded-lg transition-colors">
+                Next →
+            </button>
+        </div>
+
+        <!-- Weekly Calendar -->
+        <div id="weekly-calendar" class="grid grid-cols-1 md:grid-cols-7 gap-4 mb-8">
+            <!-- Calendar days will be populated here -->
+        </div>
+
+        <!-- Workout Legend -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6">
+            <h3 class="text-lg font-semibold mb-4">Workout Types</h3>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 bg-blue-500 rounded"></div>
+                    <span>Long Run</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 bg-orange-500 rounded"></div>
+                    <span>Tempo Run</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 bg-red-500 rounded"></div>
+                    <span>Speed/Intervals</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 bg-green-500 rounded"></div>
+                    <span>Easy Run</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 bg-purple-500 rounded"></div>
+                    <span>Race</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workout Detail Modal -->
+    <div id="workout-modal" class="hidden fixed inset-0 z-50 modal-backdrop bg-black/50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 id="modal-title" class="text-2xl font-bold"></h3>
+                    <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl">×</button>
+                </div>
+                
+                <div id="modal-content" class="space-y-4">
+                    <!-- Modal content will be populated here -->
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button id="complete-btn" onclick="completeWorkout()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                        ✅ Mark Complete
+                    </button>
+                    <button onclick="closeModal()" class="px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pace Settings Modal -->
+    <div id="pace-modal" class="hidden fixed inset-0 z-50 modal-backdrop bg-black/50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Adjust Training Paces</h3>
+                    <button onclick="closePaceModal()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl">×</button>
+                </div>
+                
+                <div id="pace-settings" class="space-y-4">
+                    <!-- Pace settings will be populated here -->
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button onclick="savePaceSettings()" class="flex-1 bg-primary hover:bg-primary-dark text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                        Save Changes
+                    </button>
+                    <button onclick="closePaceModal()" class="px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Modal -->
+    <div id="progress-modal" class="hidden fixed inset-0 z-50 modal-backdrop bg-black/50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Training Progress</h3>
+                    <button onclick="closeProgressModal()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl">×</button>
+                </div>
+                
+                <div id="progress-content" class="space-y-6">
+                    <!-- Progress content will be populated here -->
+                </div>
+                
+                <button onclick="closeProgressModal()" class="w-full mt-6 bg-primary hover:bg-primary-dark text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Management Modal -->
+    <div id="data-modal" class="hidden fixed inset-0 z-50 modal-backdrop bg-black/50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Data Management</h3>
+                    <button onclick="closeDataModal()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl">×</button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">Auto-Save Status</h4>
+                        <p class="text-sm text-blue-700 dark:text-blue-300">Your progress is automatically saved using browser storage (localStorage or cookies).</p>
+                        <div class="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                            <div>✅ Storage Available: <span id="storage-status">Detecting...</span></div>
+                            <div>📊 Data Size: <span id="data-size">Calculating...</span></div>
+                            <div>💾 Storage Method: <span id="storage-method">Auto-detecting...</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <button onclick="exportData()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                            📥 Export Progress Data
+                        </button>
+                        
+                        <div class="relative">
+                            <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(event)">
+                            <button onclick="document.getElementById('import-file').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                                📤 Import Progress Data
+                            </button>
+                        </div>
+                        
+                        <button onclick="confirmClearData()" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                            🗑️ Clear All Progress
+                        </button>
+                    </div>
+                </div>
+                
+                <button onclick="closeDataModal()" class="w-full mt-6 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 py-3 px-4 rounded-lg font-medium transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode setup
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Global state
+        let currentWeek = 1;
+        let completedWorkouts = new Set();
+        let totalDistance = 0;
+        let currentStreak = 0;
+        let achievements = [];
+        let currentWorkout = null;
+        let lastCompletionDate = null;
+        let weeklySchedule = {};
+
+        // Default paces (adjustable by user)
+        let paces = {
+            long: '6:00',
+            tempo: '5:30',
+            speed: '5:00',
+            easy: '6:15',
+            recovery: '6:30'
+        };
+
+        // Training plan data following the provided format
+        const trainingPlan = {
+            1: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w1-long', type: 'long', distance: 10, pace: '6:15', description: 'Long Run: 10 km @ 6:15/km', details: 'Build aerobic base with comfortable effort. Should feel conversational.' },
+                    { id: 'w1-tempo', type: 'tempo', distance: 4, pace: '5:40', description: 'Tempo Run: 4 km @ 5:40/km', details: 'Comfortably hard effort. You should be breathing rhythmically but unable to hold a conversation.' },
+                    { id: 'w1-speed', type: 'speed', distance: 3, pace: '5:00', description: '6x400m @ 5:00/km', details: '6 × 400m intervals at 5:00/km pace\n• 1:00 jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3km' }
+                ]
+            },
+            2: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w2-long', type: 'long', distance: 12, pace: '6:15', description: 'Long Run: 12 km @ 6:15/km', details: 'Increase distance gradually. Maintain comfortable, conversational pace throughout.' },
+                    { id: 'w2-tempo', type: 'tempo', distance: 5, pace: '5:35', description: 'Tempo Run: 5 km @ 5:35/km', details: 'Sustained hard effort. Should feel challenging but controlled. Focus on consistent pacing.' },
+                    { id: 'w2-speed', type: 'speed', distance: 3.5, pace: '5:10', description: '4x800m @ 5:10/km', details: '4 × 800m intervals at 5:10/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3.5km' }
+                ]
+            },
+            3: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w3-long', type: 'long', distance: 14, pace: '6:10', description: 'Long Run: 14 km @ 6:10/km', details: 'Slightly faster than previous weeks. Still comfortable but with more purpose.' },
+                    { id: 'w3-tempo', type: 'tempo', distance: 6, pace: '5:30', description: 'Tempo Run: 6 km @ 5:30/km', details: 'Increase tempo distance. Maintain steady, controlled effort throughout.' },
+                    { id: 'w3-speed', type: 'speed', distance: 3.5, pace: '4:55', description: '5x600m @ 4:55/km', details: '5 × 600m intervals at 4:55/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3.5km' }
+                ]
+            },
+            4: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w4-long', type: 'long', distance: 11, pace: '6:15', description: 'Long Run: 11 km @ 6:15/km (cutback)', details: 'Recovery week - reduce distance to allow adaptation. Easy, relaxed effort.' },
+                    { id: 'w4-tempo', type: 'tempo', distance: 5, pace: '5:35', description: 'Tempo Run: 5 km @ 5:35/km', details: 'Moderate tempo effort. Focus on smooth rhythm and efficient form.' },
+                    { id: 'w4-speed', type: 'speed', distance: 5, pace: 'varied', description: '5 km fartlek (1:00 hard / 2:00 easy)', details: 'Fartlek training:\n• 1km warm-up\n• 3km of 1:00 hard / 2:00 easy intervals\n• 1km cool-down\n• Hard efforts at ~4:50/km, easy at 6:30/km' }
+                ]
+            },
+            5: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w5-long', type: 'long', distance: 16, pace: '6:10', description: 'Long Run: 16 km @ 6:10/km', details: 'Building endurance. Stay relaxed and maintain steady effort throughout.' },
+                    { id: 'w5-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Sustained threshold effort. Practice race rhythm and breathing pattern.' },
+                    { id: 'w5-speed', type: 'speed', distance: 4, pace: '5:00', description: '6x800m @ 5:00/km', details: '6 × 800m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~4km' }
+                ]
+            },
+            6: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w6-long', type: 'long', distance: 18, pace: '6:05', description: 'Long Run: 18 km @ 6:05/km', details: 'Slightly faster long run pace. Building strength and efficiency.' },
+                    { id: 'w6-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Longest tempo run yet. Focus on maintaining consistent effort.' },
+                    { id: 'w6-speed', type: 'speed', distance: 6, pace: 'progression', description: '6 km progression (last 2 km @ 5:00/km)', details: 'Progression run:\n• 2km easy at 6:30/km\n• 2km moderate at 6:00/km\n• 2km fast at 5:00/km\n• Practice negative splitting' }
+                ]
+            },
+            7: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w7-long', type: 'long', distance: 20, pace: '6:05', description: 'Long Run: 20 km @ 6:05/km', details: 'Peak building phase. Maintain steady effort and focus on fueling.' },
+                    { id: 'w7-tempo', type: 'tempo', distance: 6, pace: '5:30', description: 'Tempo Run: 6 km @ 5:30/km', details: 'Faster tempo pace. Building lactate threshold and mental toughness.' },
+                    { id: 'w7-speed', type: 'speed', distance: 5, pace: '5:05', description: '5x1000m @ 5:05/km', details: '5 × 1000m intervals at 5:05/km pace\n• 2 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~5km' }
+                ]
+            },
+            8: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w8-long', type: 'long', distance: 15, pace: '6:10', description: 'Long Run: 15 km @ 6:10/km (cutback)', details: 'Recovery week. Easy effort to absorb training adaptations.' },
+                    { id: 'w8-tempo', type: 'tempo', distance: 5, pace: '5:35', description: 'Tempo Run: 5 km @ 5:35/km', details: 'Moderate tempo effort. Focus on relaxation and efficiency.' },
+                    { id: 'w8-speed', type: 'speed', distance: 6, pace: 'varied', description: '6 km fartlek (2:00 hard / 2:00 easy)', details: 'Fartlek training:\n• 1km warm-up\n• 4km of 2:00 hard / 2:00 easy intervals\n• 1km cool-down\n• Hard efforts at ~4:45/km' }
+                ]
+            },
+            9: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w9-long', type: 'long', distance: 22, pace: '6:00', description: 'Long Run: 22 km @ 6:00/km', details: 'Starting to work at closer to marathon pace. Practice race fueling.' },
+                    { id: 'w9-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Longest tempo run. Build confidence at threshold pace.' },
+                    { id: 'w9-speed', type: 'speed', distance: 4, pace: '5:00', description: '4x1 km @ 5:00/km', details: '4 × 1km intervals at 5:00/km pace\n• 2 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~4km' }
+                ]
+            },
+            10: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w10-long', type: 'long', distance: 24, pace: '6:00', description: 'Long Run: 24 km @ 6:00/km', details: 'Building to half marathon+ distance. Practice race pacing and nutrition strategy.' },
+                    { id: 'w10-tempo', type: 'tempo', distance: 7, pace: '5:30', description: 'Tempo Run: 7 km @ 5:30/km', details: 'Strong tempo effort. Focus on smooth, controlled breathing.' },
+                    { id: 'w10-speed', type: 'speed', distance: 4, pace: '4:45', description: '6x600m @ 4:45/km', details: '6 × 600m intervals at 4:45/km pace\n• 90 seconds jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~4km' }
+                ]
+            },
+            11: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w11-long', type: 'long', distance: 26, pace: '6:00', description: 'Long Run: 26 km @ 6:00/km', details: 'Beyond half marathon distance. Test race preparation and pacing strategy.' },
+                    { id: 'w11-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Peak tempo distance. Build confidence in sustained pace.' },
+                    { id: 'w11-speed', type: 'speed', distance: 6, pace: 'varied', description: '6 km hill repeats or strides', details: 'Hill training or strides:\n• 2km warm-up\n• 8 × 30 second hill repeats OR\n• 6 × 100m strides\n• 2km cool-down\n• Focus on power and form' }
+                ]
+            },
+            12: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w12-long', type: 'long', distance: 19, pace: '6:10', description: 'Long Run: 19 km @ 6:10/km (cutback)', details: 'Recovery week before building to peak phase.' },
+                    { id: 'w12-tempo', type: 'tempo', distance: 6, pace: '5:30', description: 'Tempo Run: 6 km @ 5:30/km', details: 'Moderate tempo to maintain fitness while recovering.' },
+                    { id: 'w12-speed', type: 'speed', distance: 3.5, pace: '5:00', description: '4x800m @ 5:00/km', details: '4 × 800m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3.5km' }
+                ]
+            },
+            13: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w13-long', type: 'long', distance: 28, pace: '6:00', description: 'Long Run: 28 km @ 6:00/km', details: 'Entering peak phase. Practice race pace and fueling every 5km.' },
+                    { id: 'w13-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Strong threshold work. Build lactate buffering capacity.' },
+                    { id: 'w13-speed', type: 'speed', distance: 4, pace: '5:00', description: '4x1 km @ 5:00/km', details: '4 × 1km intervals at 5:00/km pace\n• 2 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Focus on race pace rhythm' }
+                ]
+            },
+            14: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w14-long', type: 'long', distance: 30, pace: '6:00', description: 'Long Run: 30 km @ 6:00/km', details: 'Building to peak distance. Practice race day routine and gear.' },
+                    { id: 'w14-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Sustained tempo effort. Build mental toughness for marathon.' },
+                    { id: 'w14-speed', type: 'speed', distance: 4.5, pace: '5:00', description: '6x800m @ 5:00/km', details: '6 × 800m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~4.5km' }
+                ]
+            },
+            15: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w15-long', type: 'long', distance: 32, pace: '6:00', description: 'Long Run: 32 km @ 6:00/km', details: 'Peak long run distance. Simulate race conditions and practice fueling strategy.' },
+                    { id: 'w15-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Peak tempo distance. Build confidence in sustained pace effort.' },
+                    { id: 'w15-speed', type: 'speed', distance: 6, pace: 'progression', description: '6 km progression (last 2 km @ 4:55/km)', details: 'Progression run:\n• 2km at 6:30/km\n• 2km at 6:00/km\n• 2km at 4:55/km\n• Practice finishing strong' }
+                ]
+            },
+            16: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w16-long', type: 'long', distance: 24, pace: '6:10', description: 'Long Run: 24 km @ 6:10/km (cutback)', details: 'Recovery week before final peak phase. Easy, relaxed effort.' },
+                    { id: 'w16-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo to maintain fitness while recovering.' },
+                    { id: 'w16-speed', type: 'speed', distance: 5, pace: 'varied', description: '5 km fartlek (1:00 hard / 1:00 easy)', details: 'Fartlek training:\n• 1km warm-up\n• 3km of 1:00 hard / 1:00 easy intervals\n• 1km cool-down\n• Keep efforts controlled' }
+                ]
+            },
+            17: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w17-long', type: 'long', distance: 28, pace: '6:00', description: 'Long Run: 28 km @ 6:00/km', details: 'Peak training run. Practice race pace segments and fueling every 5km.' },
+                    { id: 'w17-tempo', type: 'tempo', distance: 10, pace: '5:30', description: 'Tempo Run: 10 km @ 5:30/km', details: 'Peak tempo distance. Build confidence in sustained marathon pace.' },
+                    { id: 'w17-speed', type: 'speed', distance: 4.5, pace: '5:00', description: '3x1.5 km @ 5:00/km', details: '3 × 1.5km intervals at 5:00/km pace\n• 2.5 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Focus on race pace rhythm' }
+                ]
+            },
+            18: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w18-long', type: 'long', distance: 30, pace: '6:00', description: 'Long Run: 30 km @ 6:00/km', details: 'Longest training run. Practice everything: pace, fueling, gear, mental strategies.' },
+                    { id: 'w18-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Strong tempo effort. Build confidence for marathon pace segments.' },
+                    { id: 'w18-speed', type: 'speed', distance: 4, pace: '4:45', description: '6x600m @ 4:45/km', details: '6 × 600m intervals at 4:45/km pace\n• 90 seconds jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Sharp speed to maintain leg turnover' }
+                ]
+            },
+            19: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w19-long', type: 'long', distance: 32, pace: '6:00', description: 'Long Run: 32 km @ 6:00/km', details: 'Peak long run. Final dress rehearsal - practice everything exactly as race day.' },
+                    { id: 'w19-tempo', type: 'tempo', distance: 10, pace: '5:30', description: 'Tempo Run: 10 km @ 5:30/km', details: 'Final peak tempo. Build ultimate confidence in pace and endurance.' },
+                    { id: 'w19-speed', type: 'speed', distance: 4, pace: 'progression', description: '4 km progression (finish @ 4:55/km)', details: 'Progression run:\n• 1km at 6:00/km\n• 1km at 5:30/km\n• 1km at 5:10/km\n• 1km at 4:55/km\n• Practice strong finish' }
+                ]
+            },
+            20: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w20-long', type: 'long', distance: 23, pace: '6:05', description: 'Long Run: 23 km @ 6:05/km (cutback)', details: 'Begin taper. Relaxed effort, focus on recovery and preparation.' },
+                    { id: 'w20-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Moderate tempo to maintain sharpness without stress.' },
+                    { id: 'w20-speed', type: 'speed', distance: 3, pace: '5:00', description: '5x400m @ 5:00/km', details: '5 × 400m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Keep legs sharp' }
+                ]
+            },
+            21: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w21-long', type: 'long', distance: 26, pace: '6:00', description: 'Long Run: 26 km @ 6:00/km', details: 'Final long run. Practice race pace for middle 20km. Build confidence.' },
+                    { id: 'w21-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Controlled tempo effort. Maintain fitness while allowing recovery.' },
+                    { id: 'w21-speed', type: 'speed', distance: 3, pace: '5:00', description: '3x1 km @ 5:00/km', details: '3 × 1km intervals at 5:00/km pace\n• 2 minutes jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Maintain leg speed' }
+                ]
+            },
+            22: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w22-long', type: 'long', distance: 19, pace: '6:10', description: 'Long Run: 19 km @ 6:10/km', details: 'Reduce distance significantly. Easy, comfortable effort. Focus on feeling fresh.' },
+                    { id: 'w22-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo to maintain race pace feel without fatigue.' },
+                    { id: 'w22-speed', type: 'speed', distance: 2.5, pace: '5:00', description: '4x400m @ 5:00/km', details: '4 × 400m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Keep nervous system sharp' }
+                ]
+            },
+            23: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w23-long', type: 'long', distance: 13, pace: '6:15', description: 'Long Run: 13 km @ 6:15/km', details: 'Short, easy run. Focus on feeling loose and relaxed. Practice race morning routine.' },
+                    { id: 'w23-tempo', type: 'tempo', distance: 5, pace: '5:40', description: 'Tempo Run: 5 km @ 5:40/km', details: 'Short tempo to remind muscles of race pace feel.' },
+                    { id: 'w23-speed', type: 'speed', distance: 3, pace: '5:10', description: '3x800m @ 5:10/km', details: '3 × 800m intervals at 5:10/km pace\n• 2 minutes jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Final sharpening session' }
+                ]
+            },
+            24: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w24-long', type: 'long', distance: 26, pace: '6:05', description: 'Long Run: 26 km @ 6:05/km (cutback)', details: 'Begin taper phase. Relaxed effort, focus on recovery and preparation.' },
+                    { id: 'w24-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Moderate tempo to maintain sharpness without stress.' },
+                    { id: 'w24-speed', type: 'speed', distance: 3, pace: '5:00', description: '5x400m @ 5:00/km', details: '5 × 400m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Keep legs sharp' }
+                ]
+            },
+            25: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w25-long', type: 'long', distance: 34, pace: '6:00', description: 'Long Run: 34 km @ 6:00/km', details: 'Peak training distance. Practice race strategy and nutrition timing.' },
+                    { id: 'w25-tempo', type: 'tempo', distance: 11, pace: '5:30', description: 'Tempo Run: 11 km @ 5:30/km', details: 'Longest tempo run. Build ultimate confidence in sustained pace.' },
+                    { id: 'w25-speed', type: 'speed', distance: 5, pace: '5:00', description: '4x1.5 km @ 5:00/km', details: '4 × 1.5km intervals at 5:00/km pace\n• 2.5 minutes jog recovery\n• Focus on race pace rhythm and control' }
+                ]
+            },
+            26: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w26-long', type: 'long', distance: 36, pace: '6:00', description: 'Long Run: 36 km @ 6:00/km', details: 'Longest training run. Simulate race day conditions completely.' },
+                    { id: 'w26-tempo', type: 'tempo', distance: 10, pace: '5:30', description: 'Tempo Run: 10 km @ 5:30/km', details: 'Strong tempo effort. Build confidence for marathon pace segments.' },
+                    { id: 'w26-speed', type: 'speed', distance: 4, pace: '4:45', description: '7x600m @ 4:45/km', details: '7 × 600m intervals at 4:45/km pace\n• 90 seconds jog recovery\n• Maintain leg speed and power' }
+                ]
+            },
+            27: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w27-long', type: 'long', distance: 38, pace: '6:00', description: 'Long Run: 38 km @ 6:00/km', details: 'Peak long run. Final test of endurance and race strategy.' },
+                    { id: 'w27-tempo', type: 'tempo', distance: 12, pace: '5:30', description: 'Tempo Run: 12 km @ 5:30/km', details: 'Peak tempo distance. Ultimate test of sustained pace ability.' },
+                    { id: 'w27-speed', type: 'speed', distance: 4, pace: 'progression', description: '4 km progression (finish @ 4:50/km)', details: 'Progression run:\n• 1km at 6:00/km\n• 1km at 5:30/km\n• 1km at 5:00/km\n• 1km at 4:50/km' }
+                ]
+            },
+            28: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w28-long', type: 'long', distance: 28, pace: '6:05', description: 'Long Run: 28 km @ 6:05/km (cutback)', details: 'Recovery week. Begin tapering while maintaining fitness.' },
+                    { id: 'w28-tempo', type: 'tempo', distance: 8, pace: '5:35', description: 'Tempo Run: 8 km @ 5:35/km', details: 'Moderate tempo to maintain sharpness without fatigue.' },
+                    { id: 'w28-speed', type: 'speed', distance: 3, pace: '5:00', description: '6x400m @ 5:00/km', details: '6 × 400m intervals\n• 90 seconds recovery\n• Keep nervous system sharp' }
+                ]
+            },
+            29: {
+                title: "Early Taper Phase",
+                workouts: [
+                    { id: 'w29-long', type: 'long', distance: 32, pace: '6:00', description: 'Long Run: 32 km @ 6:00/km', details: 'Final peak long run. Practice everything exactly as race day.' },
+                    { id: 'w29-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Strong tempo effort. Final confidence builder at threshold pace.' },
+                    { id: 'w29-speed', type: 'speed', distance: 4, pace: '5:00', description: '4x1 km @ 5:00/km', details: '4 × 1km intervals at race pace\n• 2 minutes recovery\n• Practice race rhythm' }
+                ]
+            },
+            30: {
+                title: "Early Taper Phase",
+                workouts: [
+                    { id: 'w30-long', type: 'long', distance: 26, pace: '6:05', description: 'Long Run: 26 km @ 6:05/km', details: 'Begin reducing volume. Maintain quality but allow recovery.' },
+                    { id: 'w30-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Moderate tempo effort. Maintain race pace feel.' },
+                    { id: 'w30-speed', type: 'speed', distance: 3, pace: '5:00', description: '5x400m @ 5:00/km', details: '5 × 400m intervals\n• Keep legs sharp but not stressed' }
+                ]
+            },
+            31: {
+                title: "Early Taper Phase",
+                workouts: [
+                    { id: 'w31-long', type: 'long', distance: 28, pace: '6:00', description: 'Long Run: 28 km @ 6:00/km', details: 'Penultimate long run. Practice race segments and fueling.' },
+                    { id: 'w31-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Strong tempo to maintain threshold fitness.' },
+                    { id: 'w31-speed', type: 'speed', distance: 3.5, pace: '5:00', description: '3x1 km @ 5:00/km', details: '3 × 1km at race pace\n• Practice race rhythm and breathing' }
+                ]
+            },
+            32: {
+                title: "Early Taper Phase", 
+                workouts: [
+                    { id: 'w32-long', type: 'long', distance: 22, pace: '6:10', description: 'Long Run: 22 km @ 6:10/km (cutback)', details: 'Recovery week. Allow adaptations while staying active.' },
+                    { id: 'w32-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo. Maintain feel without stress.' },
+                    { id: 'w32-speed', type: 'speed', distance: 2.5, pace: '5:00', description: '4x400m @ 5:00/km', details: 'Short intervals to maintain leg speed' }
+                ]
+            },
+            33: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w33-long', type: 'long', distance: 30, pace: '6:00', description: 'Long Run: 30 km @ 6:00/km', details: 'Final long run. Practice race pace for middle 20km segments.' },
+                    { id: 'w33-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Final tempo run. Build ultimate confidence.' },
+                    { id: 'w33-speed', type: 'speed', distance: 3, pace: '5:00', description: '3x1 km @ 5:00/km', details: 'Final race pace work. Perfect your rhythm.' }
+                ]
+            },
+            34: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w34-long', type: 'long', distance: 24, pace: '6:10', description: 'Long Run: 24 km @ 6:10/km', details: 'Significant volume reduction. Easy, comfortable effort.' },
+                    { id: 'w34-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo to maintain race pace feel.' },
+                    { id: 'w34-speed', type: 'speed', distance: 2.5, pace: '5:00', description: '4x400m @ 5:00/km', details: 'Keep nervous system sharp with short intervals' }
+                ]
+            },
+            35: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w35-long', type: 'long', distance: 20, pace: '6:15', description: 'Long Run: 20 km @ 6:15/km', details: 'Easy run. Focus on feeling fresh and loose.' },
+                    { id: 'w35-tempo', type: 'tempo', distance: 5, pace: '5:40', description: 'Tempo Run: 5 km @ 5:40/km', details: 'Short tempo to remind muscles of race pace.' },
+                    { id: 'w35-speed', type: 'speed', distance: 3, pace: '5:10', description: '3x800m @ 5:10/km', details: 'Final sharpening. Keep legs responsive.' }
+                ]
+            },
+            36: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w36-long', type: 'long', distance: 16, pace: '6:15', description: 'Long Run: 16 km @ 6:15/km', details: 'Short, easy run. Practice race morning routine.' },
+                    { id: 'w36-tempo', type: 'tempo', distance: 4, pace: '5:40', description: 'Tempo Run: 4 km @ 5:40/km', details: 'Very short tempo. Just touch the pace.' },
+                    { id: 'w36-speed', type: 'speed', distance: 2, pace: 'strides', description: 'Light strides', details: '6 × 100m strides with full recovery' }
+                ]
+            },
+            37: {
+                title: "Final Taper",
+                workouts: [
+                    { id: 'w37-long', type: 'long', distance: 13, pace: '6:20', description: 'Long Run: 13 km @ 6:20/km', details: 'Very easy run. Focus on feeling relaxed and ready.' },
+                    { id: 'w37-tempo', type: 'tempo', distance: 3, pace: '5:45', description: 'Tempo Run: 3 km @ 5:45/km', details: 'Minimal tempo work. Keep legs awake.' },
+                    { id: 'w37-speed', type: 'speed', distance: 2, pace: 'strides', description: '4x200m strides', details: 'Gentle strides to maintain leg turnover' }
+                ]
+            },
+            38: {
+                title: "Final Taper",
+                workouts: [
+                    { id: 'w38-long', type: 'long', distance: 10, pace: '6:30', description: 'Long Run: 10 km @ 6:30/km', details: 'Very short, very easy. Just keep moving.' },
+                    { id: 'w38-tempo', type: 'tempo', distance: 3, pace: '5:45', description: 'Tempo Run: 3 km @ 5:45/km', details: 'Brief tempo reminder.' },
+                    { id: 'w38-speed', type: 'speed', distance: 1.5, pace: 'strides', description: '3x100m strides', details: 'Minimal speed work. Keep legs loose.' }
+                ]
+            },
+            39: {
+                title: "Race Week Preparation",
+                workouts: [
+                    { id: 'w39-long', type: 'long', distance: 8, pace: '6:30', description: 'Long Run: 8 km @ 6:30/km', details: 'Very easy. Practice race week routine.' },
+                    { id: 'w39-tempo', type: 'tempo', distance: 2, pace: '5:45', description: 'Tempo Run: 2 km @ 5:45/km', details: 'Minimal tempo. Just wake up the legs.' },
+                    { id: 'w39-speed', type: 'speed', distance: 1, pace: 'strides', description: '4 x 30 second strides', details: 'Very light activation work.' }
+                ]
+            },
+            40: {
+                title: "Race Week",
+                workouts: [
+                    { id: 'w40-race', type: 'race', distance: 42.2, pace: '5:41', description: 'Marathon: 42.2 km @ 5:41/km', details: 'RACE DAY! Execute your race plan:\n• Start conservatively\n• Fuel every 5km\n• Stay relaxed first half\n• Build gradually second half\n• You are ready!' },
+                    { id: 'w40-tempo', type: 'tempo', distance: 3, pace: '5:40', description: 'Tempo Run: 3 km @ 5:40/km (early week)', details: 'Short tempo early in race week. Just remind legs of pace feel.' },
+                    { id: 'w40-speed', type: 'speed', distance: 2, pace: 'strides', description: 'Light strides', details: 'Easy running with strides:\n• 1km easy warm-up\n• 4 × 20 second strides\n• 1km easy cool-down\n• Keep legs loose and ready' }
+                ]
+            }
+        };
+
+        const weekPhases = {
+            1: "Aerobic Base & Routine Building",
+            5: "Building Strength & Mileage", 
+            9: "Race-Pace Development",
+            13: "Endurance Peak Begins",
+            17: "Marathon Specific Work",
+            25: "Peak Marathon Training",
+            29: "Early Taper Phase",
+            33: "Taper Phase",
+            37: "Final Taper",
+            39: "Race Week Preparation",
+            40: "Race Week"
+        };
+
+        const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        // Save/Load functions for data persistence (localStorage + cookie fallback)
+        let saveAttempts = 0;
+        let maxSaveAttempts = 3;
+        let lastSaveTime = 0;
+        let saveErrorCount = 0;
+        let storageMethod = 'none'; // 'localStorage', 'cookies', or 'none'
+
+        function setCookie(name, value, days = 365) {
+            try {
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+                document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function getCookie(name) {
+            try {
+                const nameEQ = name + "=";
+                const ca = document.cookie.split(';');
+                for (let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                    if (c.indexOf(nameEQ) === 0) {
+                        return decodeURIComponent(c.substring(nameEQ.length, c.length));
+                    }
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function deleteCookie(name) {
+            try {
+                document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function detectStorageMethod() {
+            // Try localStorage first
+            try {
+                const test = '__storage_test__';
+                localStorage.setItem(test, test);
+                localStorage.removeItem(test);
+                storageMethod = 'localStorage';
+                return 'localStorage';
+            } catch (e) {
+                // Try cookies as fallback
+                try {
+                    const test = '__cookie_test__';
+                    setCookie(test, 'test');
+                    const result = getCookie(test) === 'test';
+                    deleteCookie(test);
+                    if (result) {
+                        storageMethod = 'cookies';
+                        return 'cookies';
+                    }
+                } catch (e) {
+                    // Neither works
+                    storageMethod = 'none';
+                    return 'none';
+                }
+            }
+            storageMethod = 'none';
+            return 'none';
+        }
+
+        function isStorageAvailable() {
+            return storageMethod !== 'none';
+        }
+
+        function setStorageItem(key, value) {
+            if (storageMethod === 'localStorage') {
+                localStorage.setItem(key, value);
+                return true;
+            } else if (storageMethod === 'cookies') {
+                return setCookie(key, value);
+            }
+            return false;
+        }
+
+        function getStorageItem(key) {
+            if (storageMethod === 'localStorage') {
+                return localStorage.getItem(key);
+            } else if (storageMethod === 'cookies') {
+                return getCookie(key);
+            }
+            return null;
+        }
+
+        function removeStorageItem(key) {
+            if (storageMethod === 'localStorage') {
+                localStorage.removeItem(key);
+                return true;
+            } else if (storageMethod === 'cookies') {
+                return deleteCookie(key);
+            }
+            return false;
+        }
+
+        function saveProgress(showNotification = false) {
+            // Prevent excessive save attempts
+            const now = Date.now();
+            if (now - lastSaveTime < 1000) { // Minimum 1 second between saves
+                return true;
+            }
+            lastSaveTime = now;
+
+            if (!isStorageAvailable()) {
+                if (showNotification) {
+                    showSaveNotification(`Storage not available (${storageMethod}) - progress cannot be saved`, 'error');
+                }
+                return false;
+            }
+
+            try {
+                const progressData = {
+                    currentWeek,
+                    completedWorkouts: Array.from(completedWorkouts),
+                    totalDistance,
+                    currentStreak,
+                    achievements,
+                    lastCompletionDate,
+                    weeklySchedule,
+                    paces,
+                    savedAt: now,
+                    storageMethod: storageMethod
+                };
+                
+                const dataString = JSON.stringify(progressData);
+                
+                // Check data size limits based on storage method
+                const sizeLimit = storageMethod === 'localStorage' ? 4000000 : 3000; // 4MB for localStorage, 3KB for cookies
+                if (dataString.length > sizeLimit) {
+                    throw new Error(`Data too large for ${storageMethod}`);
+                }
+                
+                setStorageItem('marathonTrainingProgress', dataString);
+                
+                // Reset error count on successful save
+                saveErrorCount = 0;
+                saveAttempts = 0;
+                
+                if (showNotification) {
+                    showSaveNotification(`Progress saved successfully (${storageMethod})`, 'success');
+                }
+                return true;
+            } catch (error) {
+                console.error('Failed to save progress:', error);
+                saveErrorCount++;
+                saveAttempts++;
+                
+                // Only show error notification after multiple failures or if explicitly requested
+                if (showNotification || saveErrorCount >= 3) {
+                    let errorMessage = 'Failed to save progress';
+                    
+                    if (error.name === 'QuotaExceededError' || error.message.includes('quota')) {
+                        errorMessage = 'Storage quota exceeded - please clear browser data or export your progress';
+                    } else if (error.message.includes('too large')) {
+                        errorMessage = `Training data too large for ${storageMethod} - please export your progress`;
+                    } else if (!isStorageAvailable()) {
+                        errorMessage = `${storageMethod} storage disabled - check browser settings`;
+                    }
+                    
+                    showSaveNotification(errorMessage, 'error');
+                }
+                
+                return false;
+            }
+        }
+
+        function loadProgress() {
+            if (!isStorageAvailable()) {
+                initializeSchedule();
+                showSaveNotification(`${storageMethod} storage not available - progress will not be saved`, 'error');
+                return false;
+            }
+
+            try {
+                const savedData = getStorageItem('marathonTrainingProgress');
+                if (savedData) {
+                    const progressData = JSON.parse(savedData);
+                    
+                    // Validate data structure
+                    if (typeof progressData !== 'object' || progressData === null) {
+                        throw new Error('Invalid data format');
+                    }
+                    
+                    // Restore all state with fallbacks
+                    currentWeek = Math.max(1, Math.min(40, progressData.currentWeek || 1));
+                    completedWorkouts = new Set(Array.isArray(progressData.completedWorkouts) ? progressData.completedWorkouts : []);
+                    totalDistance = Math.max(0, progressData.totalDistance || 0);
+                    currentStreak = Math.max(0, progressData.currentStreak || 0);
+                    achievements = Array.isArray(progressData.achievements) ? progressData.achievements : [];
+                    lastCompletionDate = progressData.lastCompletionDate || null;
+                    
+                    // Restore custom paces if they exist
+                    if (progressData.paces && typeof progressData.paces === 'object') {
+                        Object.assign(paces, progressData.paces);
+                        updateAllWorkoutPaces();
+                    }
+                    
+                    // Restore weekly schedule if it exists
+                    if (progressData.weeklySchedule && typeof progressData.weeklySchedule === 'object') {
+                        weeklySchedule = progressData.weeklySchedule;
+                    } else {
+                        initializeSchedule();
+                    }
+                    
+                    // Only show success notification if we have meaningful data
+                    if (completedWorkouts.size > 0 || currentWeek > 1) {
+                        const method = progressData.storageMethod || storageMethod;
+                        showSaveNotification(`Previous progress restored (${method})`, 'success');
+                    }
+                    return true;
+                }
+            } catch (error) {
+                console.error('Failed to load progress:', error);
+                // Don't show error for normal "no data" case
+                if (getStorageItem('marathonTrainingProgress')) {
+                    showSaveNotification('Previous progress corrupted - starting fresh', 'error');
+                }
+            }
+            
+            // Initialize if no saved data or loading failed
+            initializeSchedule();
+            return false;
+        }
+
+        function clearProgress() {
+            try {
+                removeStorageItem('marathonTrainingProgress');
+                
+                // Reset all state
+                currentWeek = 1;
+                completedWorkouts.clear();
+                totalDistance = 0;
+                currentStreak = 0;
+                achievements = [];
+                lastCompletionDate = null;
+                
+                // Reset paces to defaults
+                paces = {
+                    long: '6:00',
+                    tempo: '5:30',
+                    speed: '5:00',
+                    easy: '6:15',
+                    recovery: '6:30'
+                };
+                
+                initializeSchedule();
+                renderWeeklyCalendar();
+                showSaveNotification(`Progress cleared successfully (${storageMethod})`, 'success');
+                return true;
+            } catch (error) {
+                console.error('Failed to clear progress:', error);
+                showSaveNotification('Failed to clear progress', 'error');
+                return false;
+            }
+        }
+
+        function showSaveNotification(message, type = 'info') {
+            // Don't show too many notifications
+            const existingNotifications = document.querySelectorAll('.save-notification');
+            if (existingNotifications.length >= 2) {
+                existingNotifications[0].remove();
+            }
+            
+            const notification = document.createElement('div');
+            notification.className = `save-notification fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 transform translate-x-full shadow-lg ${
+                type === 'success' ? 'bg-green-500 text-white' : 
+                type === 'error' ? 'bg-red-500 text-white' : 
+                'bg-blue-500 text-white'
+            }`;
+            notification.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span>${type === 'success' ? '✅' : type === 'error' ? '⚠️' : 'ℹ️'}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto-remove after delay (longer for errors)
+            const delay = type === 'error' ? 7000 : 2000;
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, delay);
+        }
+
+        function updateAllWorkoutPaces() {
+            // Update training plan with current paces
+            for (let week = 1; week <= 40; week++) {
+                const weekData = trainingPlan[week];
+                if (weekData) {
+                    weekData.workouts.forEach(workout => {
+                        // Update pace based on workout type
+                        if (workout.type === 'long' && paces.long) {
+                            workout.pace = paces.long;
+                        } else if (workout.type === 'tempo' && paces.tempo) {
+                            workout.pace = paces.tempo;
+                        } else if (workout.type === 'speed' && paces.speed) {
+                            workout.pace = paces.speed;
+                        } else if (workout.type === 'easy' && paces.easy) {
+                            workout.pace = paces.easy;
+                        } else if (workout.type === 'recovery' && paces.recovery) {
+                            workout.pace = paces.recovery;
+                        }
+                        
+                        // Update description to reflect new pace
+                        if (workout.pace !== 'varied' && workout.pace !== 'strides' && workout.pace !== 'progression') {
+                            if (workout.type === 'long') {
+                                workout.description = `Long Run: ${workout.distance} km @ ${workout.pace}/km`;
+                            } else if (workout.type === 'tempo') {
+                                workout.description = `Tempo Run: ${workout.distance} km @ ${workout.pace}/km`;
+                            } else if (workout.type === 'speed' && workout.description.includes('x')) {
+                                // Keep interval descriptions but update pace references
+                                const intervalMatch = workout.description.match(/(\d+x\d+m)/);
+                                if (intervalMatch) {
+                                    workout.description = workout.description.replace(/@\s*[\d:]+\/km/, `@ ${workout.pace}/km`);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        function initializeSchedule() {
+            for (let week = 1; week <= 40; week++) {
+                weeklySchedule[week] = {
+                    Monday: [],
+                    Tuesday: [],
+                    Wednesday: [],
+                    Thursday: [],
+                    Friday: [],
+                    Saturday: [],
+                    Sunday: []
+                };
+
+                const weekData = trainingPlan[week];
+                if (weekData) {
+                    // Default assignment: Long run on Sunday, Tempo on Tuesday, Speed on Thursday
+                    const workouts = weekData.workouts;
+                    if (workouts[0]) weeklySchedule[week].Sunday.push(workouts[0]); // Long run
+                    if (workouts[1]) weeklySchedule[week].Tuesday.push(workouts[1]); // Tempo
+                    if (workouts[2]) weeklySchedule[week].Thursday.push(workouts[2]); // Speed
+                }
+            }
+        }
+
+        function renderWeeklyCalendar() {
+            const calendar = document.getElementById('weekly-calendar');
+            const weekData = weeklySchedule[currentWeek] || {};
+            
+            calendar.innerHTML = dayNames.map(day => `
+                <div class="day-column">
+                    <div class="day-header bg-white dark:bg-gray-800 rounded-t-xl p-3 border-b border-gray-200 dark:border-gray-700">
+                        <h4 class="font-semibold text-center">${day}</h4>
+                    </div>
+                    <div class="day-slot bg-gray-50 dark:bg-gray-800 rounded-b-xl p-3 min-h-[120px]" 
+                         data-day="${day}" 
+                         ondragover="allowDrop(event)" 
+                         ondrop="drop(event)">
+                        ${(weekData[day] || []).map(workout => renderWorkoutCard(workout)).join('')}
+                    </div>
+                </div>
+            `).join('');
+            
+            updateWeekInfo();
+        }
+
+        function renderWorkoutCard(workout) {
+            const isCompleted = completedWorkouts.has(workout.id);
+            const typeColors = {
+                long: 'border-blue-500',
+                tempo: 'border-orange-500', 
+                speed: 'border-red-500',
+                easy: 'border-green-500',
+                race: 'border-purple-500'
+            };
+
+            return `
+                <div class="workout-card ${isCompleted ? 'completed-workout' : ''} bg-white dark:bg-gray-700 rounded-lg p-3 mb-2 border-l-4 ${typeColors[workout.type] || 'border-gray-500'} cursor-pointer shadow-sm hover:shadow-md transition-all"
+                     draggable="true" 
+                     ondragstart="dragStart(event)" 
+                     data-workout-id="${workout.id}"
+                     onclick="showWorkoutDetails('${workout.id}')">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-medium text-sm capitalize">${workout.type}</span>
+                        <span class="text-xs text-gray-500">${workout.distance}km</span>
+                    </div>
+                    <div class="text-xs text-gray-600 dark:text-gray-400 truncate">
+                        ${workout.description}
+                    </div>
+                    <div class="text-xs text-primary font-medium mt-1">
+                        @ ${workout.pace}/km
+                    </div>
+                    ${isCompleted ? '<div class="text-xs text-green-600 dark:text-green-400 mt-1">✅ Completed</div>' : ''}
+                </div>
+            `;
+        }
+
+        function getWeekDateRange(weekNumber) {
+            // Start from June 16, 2025 (which is a Monday)
+            const baseDate = new Date('2025-06-16');
+            const startDate = new Date(baseDate);
+            startDate.setDate(baseDate.getDate() + (weekNumber - 1) * 7);
+            
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 6);
+            
+            const formatDate = (date) => {
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                return `${day}/${month}`;
+            };
+            
+            return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+        }
+
+        function updateWeekInfo() {
+            const weekTitle = document.getElementById('week-title');
+            const weekSubtitle = document.getElementById('week-subtitle');
+            
+            const dateRange = getWeekDateRange(currentWeek);
+            weekTitle.innerHTML = `Week ${currentWeek}<br><span class="text-lg font-normal text-gray-600 dark:text-gray-400">${dateRange}</span>`;
+            
+            // Find the current phase
+            let currentPhase = "Aerobic Base & Routine Building";
+            for (let phase in weekPhases) {
+                if (currentWeek >= parseInt(phase)) {
+                    currentPhase = weekPhases[phase];
+                }
+            }
+            weekSubtitle.textContent = currentPhase;
+        }
+
+        function changeWeek(direction) {
+            const newWeek = currentWeek + direction;
+            if (newWeek >= 1 && newWeek <= 40) {
+                currentWeek = newWeek;
+                renderWeeklyCalendar();
+                
+                // Save progress after changing week
+                saveProgress();
+            }
+        }
+
+        // Drag and drop functions
+        function allowDrop(ev) {
+            ev.preventDefault();
+            ev.target.closest('.day-slot').classList.add('drag-over');
+        }
+
+        function dragStart(ev) {
+            ev.dataTransfer.setData("text", ev.target.dataset.workoutId);
+            ev.target.classList.add('dragging');
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const workoutId = ev.dataTransfer.getData("text");
+            const targetDay = ev.target.closest('.day-slot').dataset.day;
+            const sourceElement = document.querySelector(`[data-workout-id="${workoutId}"]`);
+            
+            if (sourceElement) {
+                // Find source day and remove workout
+                let sourceDay = null;
+                for (let day in weeklySchedule[currentWeek]) {
+                    const dayWorkouts = weeklySchedule[currentWeek][day];
+                    const workoutIndex = dayWorkouts.findIndex(w => w.id === workoutId);
+                    if (workoutIndex !== -1) {
+                        sourceDay = day;
+                        dayWorkouts.splice(workoutIndex, 1);
+                        break;
+                    }
+                }
+                
+                // Add workout to target day
+                if (sourceDay) {
+                    const workout = trainingPlan[currentWeek].workouts.find(w => w.id === workoutId);
+                    if (workout) {
+                        weeklySchedule[currentWeek][targetDay].push(workout);
+                    }
+                }
+            }
+            
+            // Clean up drag state
+            document.querySelectorAll('.day-slot').forEach(slot => {
+                slot.classList.remove('drag-over');
+            });
+            document.querySelectorAll('.workout-card').forEach(card => {
+                card.classList.remove('dragging');
+            });
+            
+            renderWeeklyCalendar();
+            
+            // Save progress after moving workout
+            saveProgress();
+        }
+
+        function showWorkoutDetails(workoutId) {
+            const workout = findWorkoutById(workoutId);
+            if (!workout) return;
+            
+            currentWorkout = workout;
+            const modal = document.getElementById('workout-modal');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content');
+            const completeBtn = document.getElementById('complete-btn');
+            
+            title.textContent = `${workout.type.charAt(0).toUpperCase() + workout.type.slice(1)} Run`;
+            
+            const isCompleted = completedWorkouts.has(workoutId);
+            completeBtn.textContent = isCompleted ? '✅ Completed' : '✅ Mark Complete';
+            completeBtn.disabled = isCompleted;
+            completeBtn.className = isCompleted ? 
+                'flex-1 bg-gray-400 text-white py-3 px-4 rounded-lg font-medium cursor-not-allowed' :
+                'flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-colors cursor-pointer';
+            
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                        <h4 class="font-semibold mb-2">Workout Overview</h4>
+                        <p class="text-gray-700 dark:text-gray-300">${workout.description}</p>
+                    </div>
+                    
+                    <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
+                        <h4 class="font-semibold mb-2">Detailed Instructions</h4>
+                        <pre class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">${workout.details}</pre>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-primary">${workout.distance}km</div>
+                            <div class="text-sm text-gray-500">Distance</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-primary">${workout.pace === 'varied' || workout.pace === 'strides' || workout.pace === 'progression' ? 'Varied' : workout.pace + '/km'}</div>
+                            <div class="text-sm text-gray-500">Target Pace</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function findWorkoutById(workoutId) {
+            for (let week = 1; week <= 40; week++) {
+                const weekData = trainingPlan[week];
+                if (weekData) {
+                    const workout = weekData.workouts.find(w => w.id === workoutId);
+                    if (workout) return workout;
+                }
+            }
+            return null;
+        }
+
+        function completeWorkout() {
+            if (!currentWorkout || completedWorkouts.has(currentWorkout.id)) return;
+            
+            completedWorkouts.add(currentWorkout.id);
+            totalDistance += currentWorkout.distance;
+            
+            // Update streak logic
+            const today = new Date().toDateString();
+            if (lastCompletionDate === today) {
+                // Same day, no streak change
+            } else if (lastCompletionDate === new Date(Date.now() - 86400000).toDateString()) {
+                // Yesterday, continue streak
+                currentStreak++;
+            } else {
+                // Start new streak
+                currentStreak = 1;
+            }
+            lastCompletionDate = today;
+            
+            showCelebration(currentWorkout);
+            closeModal();
+            renderWeeklyCalendar();
+            
+            // Save progress after completing workout
+            saveProgress(true);
+        }
+
+        function showCelebration(workout) {
+            const celebration = document.createElement('div');
+            celebration.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/20';
+            celebration.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center max-w-sm mx-4 transform scale-0 transition-transform duration-500">
+                    <div class="text-6xl mb-4">🎉</div>
+                    <h3 class="text-2xl font-bold text-primary mb-2">Workout Complete!</h3>
+                    <p class="text-gray-600 dark:text-gray-400 mb-2">${workout.distance}km ${workout.type} run</p>
+                    <p class="text-sm text-primary font-medium">+${workout.distance * 10} XP</p>
+                </div>
+            `;
+            
+            document.body.appendChild(celebration);
+            
+            setTimeout(() => {
+                celebration.querySelector('div').style.transform = 'scale(1)';
+            }, 100);
+            
+            setTimeout(() => {
+                celebration.remove();
+            }, 3000);
+        }
+
+        function closeModal() {
+            document.getElementById('workout-modal').classList.add('hidden');
+            currentWorkout = null;
+        }
+
+        function showPaceSettings() {
+            const modal = document.getElementById('pace-modal');
+            const settings = document.getElementById('pace-settings');
+            
+            settings.innerHTML = Object.entries(paces).map(([type, pace]) => `
+                <div>
+                    <label class="block text-sm font-medium mb-2 capitalize">${type} Pace</label>
+                    <input type="text" 
+                           id="pace-${type}" 
+                           value="${pace}" 
+                           placeholder="e.g. 5:30"
+                           class="w-full text-base px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary focus:border-transparent">
+                </div>
+            `).join('');
+            
+            modal.classList.remove('hidden');
+        }
+
+        function savePaceSettings() {
+            // Update paces object
+            Object.keys(paces).forEach(type => {
+                const input = document.getElementById(`pace-${type}`);
+                if (input && input.value) {
+                    paces[type] = input.value;
+                }
+            });
+            
+            updateAllWorkoutPaces();
+            renderWeeklyCalendar();
+            closePaceModal();
+            
+            // Save progress after updating paces
+            saveProgress(true);
+        }
+
+        function closePaceModal() {
+            document.getElementById('pace-modal').classList.add('hidden');
+        }
+
+        function showProgress() {
+            const modal = document.getElementById('progress-modal');
+            const content = document.getElementById('progress-content');
+            
+            const totalWorkouts = Object.values(trainingPlan).reduce((sum, week) => sum + week.workouts.length, 0);
+            const completed = completedWorkouts.size;
+            const percentage = Math.round((completed / totalWorkouts) * 100);
+            
+            content.innerHTML = `
+                <div class="bg-gradient-to-r from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 rounded-xl p-6">
+                    <h4 class="text-xl font-semibold mb-4">Overall Progress</h4>
+                    <div class="bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4">
+                        <div class="bg-gradient-to-r from-primary to-purple-500 rounded-full h-4 transition-all duration-500" style="width: ${percentage}%"></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-primary">${completed}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Completed</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-green-600">${Math.round(totalDistance)}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Total km</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-orange-500">${currentStreak}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Streak</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
+                    <h4 class="text-lg font-semibold mb-4">Weekly Breakdown</h4>
+                    <div class="space-y-2">
+                        ${Array.from({length: 40}, (_, i) => {
+                            const week = i + 1;
+                            const weekWorkouts = trainingPlan[week].workouts;
+                            const weekCompleted = weekWorkouts.filter(w => completedWorkouts.has(w.id)).length;
+                            const weekPercentage = Math.round((weekCompleted / weekWorkouts.length) * 100);
+                            
+                            return `
+                                <div class="flex items-center justify-between py-2">
+                                    <span class="text-sm">Week ${week}</span>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                            <div class="bg-primary rounded-full h-2" style="width: ${weekPercentage}%"></div>
+                                        </div>
+                                        <span class="text-xs text-gray-500 w-8">${weekCompleted}/${weekWorkouts.length}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeProgressModal() {
+            document.getElementById('progress-modal').classList.add('hidden');
+        }
+
+        function showDataManagement() {
+            // Update storage status
+            const storageAvailable = isStorageAvailable();
+            document.getElementById('storage-status').textContent = storageAvailable ? `Yes (${storageMethod})` : 'No';
+            document.getElementById('storage-method').textContent = storageMethod;
+            
+            // Calculate data size
+            try {
+                const savedData = getStorageItem('marathonTrainingProgress');
+                const dataSize = savedData ? (savedData.length / 1024).toFixed(1) + ' KB' : '0 KB';
+                document.getElementById('data-size').textContent = dataSize;
+            } catch (e) {
+                document.getElementById('data-size').textContent = 'Unknown';
+            }
+            
+            document.getElementById('data-modal').classList.remove('hidden');
+        }
+
+        function closeDataModal() {
+            document.getElementById('data-modal').classList.add('hidden');
+        }
+
+        function exportData() {
+            try {
+                const progressData = {
+                    currentWeek,
+                    completedWorkouts: Array.from(completedWorkouts),
+                    totalDistance,
+                    currentStreak,
+                    achievements,
+                    lastCompletionDate,
+                    weeklySchedule,
+                    paces,
+                    exportedAt: new Date().toISOString(),
+                    appVersion: '1.0'
+                };
+                
+                const dataStr = JSON.stringify(progressData, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `marathon-training-progress-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                showSaveNotification('Progress data exported successfully', 'success');
+            } catch (error) {
+                console.error('Export failed:', error);
+                showSaveNotification('Failed to export progress data', 'error');
+            }
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const progressData = JSON.parse(e.target.result);
+                    
+                    // Validate the data structure
+                    if (!progressData.completedWorkouts || !Array.isArray(progressData.completedWorkouts)) {
+                        throw new Error('Invalid data format');
+                    }
+                    
+                    // Restore the data
+                    currentWeek = progressData.currentWeek || 1;
+                    completedWorkouts = new Set(progressData.completedWorkouts);
+                    totalDistance = progressData.totalDistance || 0;
+                    currentStreak = progressData.currentStreak || 0;
+                    achievements = progressData.achievements || [];
+                    lastCompletionDate = progressData.lastCompletionDate || null;
+                    
+                    if (progressData.paces) {
+                        Object.assign(paces, progressData.paces);
+                        updateAllWorkoutPaces();
+                    }
+                    
+                    if (progressData.weeklySchedule) {
+                        weeklySchedule = progressData.weeklySchedule;
+                    } else {
+                        initializeSchedule();
+                    }
+                    
+                    // Save the imported data
+                    saveProgress(true);
+                    
+                    // Update the UI
+                    renderWeeklyCalendar();
+                    closeDataModal();
+                    
+                    showSaveNotification('Progress data imported successfully', 'success');
+                } catch (error) {
+                    console.error('Import failed:', error);
+                    showSaveNotification('Failed to import progress data - invalid file format', 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+            // Reset the file input
+            event.target.value = '';
+        }
+
+        function confirmClearData() {
+            if (confirm('Are you sure you want to clear all progress? This action cannot be undone.')) {
+                clearProgress();
+                closeDataModal();
+            }
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Detect and initialize storage method first
+            detectStorageMethod();
+            console.log(`Storage method detected: ${storageMethod}`);
+            
+            // Load saved progress first, then render
+            loadProgress();
+            renderWeeklyCalendar();
+        });
+
+        // Close modals when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal-backdrop')) {
+                closeModal();
+                closePaceModal();
+                closeProgressModal();
+                closeDataModal();
+            }
+        });
+
+        // Auto-save progress periodically (every 2 minutes to reduce frequency)
+        setInterval(() => {
+            saveProgress();
+        }, 120000);
+
+        // Save before page unload
+        window.addEventListener('beforeunload', () => {
+            saveProgress();
+        });
+    </script>
+</body>
+</html>
