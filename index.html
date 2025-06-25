@@ -258,85 +258,351 @@ Outdated design but with local storage working RunGeorge
 
         // Default paces (adjustable by user)
         let paces = {
-            long: '5:50',
-            tempo: '4:40',
-            speed: '4:15',
+            long: '6:00',
+            tempo: '5:30',
+            speed: '5:00',
             easy: '6:15',
             recovery: '6:30'
         };
 
         // Training plan data following the provided format
-        // ---- PLAN GENERATION ----
-    function generatePlan(settings) {
-      // Algorithm: Progressive long run (starts at 8km), cutback every 4th week, taper last 3 weeks.
-      // Assigns: tempo (Tue), speed (Thu), long (Sun)
-      let plan = [];
-      let long = 8;
-      let date = new Date(settings.startDate);
-      let pTempo = settings.paceTempo;
-      let pLong = settings.paceLong;
-      let pSpeed = settings.paceSpeed;
-      let numWorkouts = settings.workoutsPerWeek;
-      for(let w=0;w<40;w++) {
-        let week = Array(7).fill(null);
-        // Long run logic
-        let isCutback = ((w+1)%4===0), isTaper = (w>=37);
-        if(isTaper) long = Math.max(13, Math.round(long*0.7));
-        else if(isCutback) long = Math.max(13, Math.round(long*0.7));
-        else long = Math.min(33, Math.round(long+1.5));
-        // Assign days: Tue(1): tempo, Thu(3): speed, Sun(6): long
-        // Optionally add Wed(2): easy for 4/wk
-        if(numWorkouts >= 3) {
-          week[1] = {
-            type: "tempo",
-            title: "Tempo Run",
-            desc: `${Math.max(4,Math.round(long/2.5))}km @ ${pTempo}/km\nTempo pace`,
-            distance: Math.max(4,Math.round(long/2.5)),
-            pace: pTempo,
-            points: 20 + Math.round(2 * Math.max(4,Math.round(long/2.5)))
-          };
-          week[3] = {
-            type: "speed",
-            title: "Speed/Interval",
-            desc: `${5+(w%3)}km @ ${pSpeed}/km\nIntervals or fartlek`,
-            distance: 5+(w%3),
-            pace: pSpeed,
-            points: 20 + Math.round(2.5*(5+(w%3)))
-          };
-          week[6] = {
-            type: "long",
-            title: "Long Run",
-            desc: `${long}km @ ${pLong}/km\nLong run pace`,
-            distance: long,
-            pace: pLong,
-            points: 30 + Math.round(long*2.8)
-          };
-        }
-        if(numWorkouts === 4) {
-          week[4] = {
-            type: "easy",
-            title: "Easy Run",
-            desc: `${Math.max(4,Math.round(long/3.5))}km @ ${plusMinutes(pLong,0.30)}/km\nEasy pace`,
-            distance: Math.max(4,Math.round(long/3.5)),
-            pace: plusMinutes(pLong,0.30),
-            points: 10 + Math.round(1.6 * Math.max(4,Math.round(long/3.5)))
-          };
-        }
-        plan.push(week);
-        date.setDate(date.getDate()+7);
-      }
-      return plan;
-    }
-    function plusMinutes(pace, plus) {
-      // pace "5:45", plus in decimal minutes
-      let [m,s] = pace.split(":").map(Number);
-      let total = m + s/60 + plus;
-      let mi = Math.floor(total);
-      let se = Math.round((total-mi)*60);
-      return `${mi}:${se<10?'0':''}${se}`;
-    }
+        const trainingPlan = {
+            1: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w1-long', type: 'long', distance: 10, pace: '6:15', description: 'Long Run: 10 km @ 6:15/km', details: 'Build aerobic base with comfortable effort. Should feel conversational.' },
+                    { id: 'w1-tempo', type: 'tempo', distance: 4, pace: '5:40', description: 'Tempo Run: 4 km @ 5:40/km', details: 'Comfortably hard effort. You should be breathing rhythmically but unable to hold a conversation.' },
+                    { id: 'w1-speed', type: 'speed', distance: 3, pace: '5:00', description: '6x400m @ 5:00/km', details: '6 × 400m intervals at 5:00/km pace\n• 1:00 jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3km' }
+                ]
+            },
+            2: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w2-long', type: 'long', distance: 12, pace: '6:15', description: 'Long Run: 12 km @ 6:15/km', details: 'Increase distance gradually. Maintain comfortable, conversational pace throughout.' },
+                    { id: 'w2-tempo', type: 'tempo', distance: 5, pace: '5:35', description: 'Tempo Run: 5 km @ 5:35/km', details: 'Sustained hard effort. Should feel challenging but controlled. Focus on consistent pacing.' },
+                    { id: 'w2-speed', type: 'speed', distance: 3.5, pace: '5:10', description: '4x800m @ 5:10/km', details: '4 × 800m intervals at 5:10/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3.5km' }
+                ]
+            },
+            3: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w3-long', type: 'long', distance: 14, pace: '6:10', description: 'Long Run: 14 km @ 6:10/km', details: 'Slightly faster than previous weeks. Still comfortable but with more purpose.' },
+                    { id: 'w3-tempo', type: 'tempo', distance: 6, pace: '5:30', description: 'Tempo Run: 6 km @ 5:30/km', details: 'Increase tempo distance. Maintain steady, controlled effort throughout.' },
+                    { id: 'w3-speed', type: 'speed', distance: 3.5, pace: '4:55', description: '5x600m @ 4:55/km', details: '5 × 600m intervals at 4:55/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3.5km' }
+                ]
+            },
+            4: {
+                title: "Aerobic Base & Routine Building",
+                workouts: [
+                    { id: 'w4-long', type: 'long', distance: 11, pace: '6:15', description: 'Long Run: 11 km @ 6:15/km (cutback)', details: 'Recovery week - reduce distance to allow adaptation. Easy, relaxed effort.' },
+                    { id: 'w4-tempo', type: 'tempo', distance: 5, pace: '5:35', description: 'Tempo Run: 5 km @ 5:35/km', details: 'Moderate tempo effort. Focus on smooth rhythm and efficient form.' },
+                    { id: 'w4-speed', type: 'speed', distance: 5, pace: 'varied', description: '5 km fartlek (1:00 hard / 2:00 easy)', details: 'Fartlek training:\n• 1km warm-up\n• 3km of 1:00 hard / 2:00 easy intervals\n• 1km cool-down\n• Hard efforts at ~4:50/km, easy at 6:30/km' }
+                ]
+            },
+            5: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w5-long', type: 'long', distance: 16, pace: '6:10', description: 'Long Run: 16 km @ 6:10/km', details: 'Building endurance. Stay relaxed and maintain steady effort throughout.' },
+                    { id: 'w5-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Sustained threshold effort. Practice race rhythm and breathing pattern.' },
+                    { id: 'w5-speed', type: 'speed', distance: 4, pace: '5:00', description: '6x800m @ 5:00/km', details: '6 × 800m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~4km' }
+                ]
+            },
+            6: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w6-long', type: 'long', distance: 18, pace: '6:05', description: 'Long Run: 18 km @ 6:05/km', details: 'Slightly faster long run pace. Building strength and efficiency.' },
+                    { id: 'w6-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Longest tempo run yet. Focus on maintaining consistent effort.' },
+                    { id: 'w6-speed', type: 'speed', distance: 6, pace: 'progression', description: '6 km progression (last 2 km @ 5:00/km)', details: 'Progression run:\n• 2km easy at 6:30/km\n• 2km moderate at 6:00/km\n• 2km fast at 5:00/km\n• Practice negative splitting' }
+                ]
+            },
+            7: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w7-long', type: 'long', distance: 20, pace: '6:05', description: 'Long Run: 20 km @ 6:05/km', details: 'Peak building phase. Maintain steady effort and focus on fueling.' },
+                    { id: 'w7-tempo', type: 'tempo', distance: 6, pace: '5:30', description: 'Tempo Run: 6 km @ 5:30/km', details: 'Faster tempo pace. Building lactate threshold and mental toughness.' },
+                    { id: 'w7-speed', type: 'speed', distance: 5, pace: '5:05', description: '5x1000m @ 5:05/km', details: '5 × 1000m intervals at 5:05/km pace\n• 2 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~5km' }
+                ]
+            },
+            8: {
+                title: "Building Strength & Mileage",
+                workouts: [
+                    { id: 'w8-long', type: 'long', distance: 15, pace: '6:10', description: 'Long Run: 15 km @ 6:10/km (cutback)', details: 'Recovery week. Easy effort to absorb training adaptations.' },
+                    { id: 'w8-tempo', type: 'tempo', distance: 5, pace: '5:35', description: 'Tempo Run: 5 km @ 5:35/km', details: 'Moderate tempo effort. Focus on relaxation and efficiency.' },
+                    { id: 'w8-speed', type: 'speed', distance: 6, pace: 'varied', description: '6 km fartlek (2:00 hard / 2:00 easy)', details: 'Fartlek training:\n• 1km warm-up\n• 4km of 2:00 hard / 2:00 easy intervals\n• 1km cool-down\n• Hard efforts at ~4:45/km' }
+                ]
+            },
+            9: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w9-long', type: 'long', distance: 22, pace: '6:00', description: 'Long Run: 22 km @ 6:00/km', details: 'Starting to work at closer to marathon pace. Practice race fueling.' },
+                    { id: 'w9-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Longest tempo run. Build confidence at threshold pace.' },
+                    { id: 'w9-speed', type: 'speed', distance: 4, pace: '5:00', description: '4x1 km @ 5:00/km', details: '4 × 1km intervals at 5:00/km pace\n• 2 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~4km' }
+                ]
+            },
+            10: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w10-long', type: 'long', distance: 24, pace: '6:00', description: 'Long Run: 24 km @ 6:00/km', details: 'Building to half marathon+ distance. Practice race pacing and nutrition strategy.' },
+                    { id: 'w10-tempo', type: 'tempo', distance: 7, pace: '5:30', description: 'Tempo Run: 7 km @ 5:30/km', details: 'Strong tempo effort. Focus on smooth, controlled breathing.' },
+                    { id: 'w10-speed', type: 'speed', distance: 4, pace: '4:45', description: '6x600m @ 4:45/km', details: '6 × 600m intervals at 4:45/km pace\n• 90 seconds jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~4km' }
+                ]
+            },
+            11: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w11-long', type: 'long', distance: 26, pace: '6:00', description: 'Long Run: 26 km @ 6:00/km', details: 'Beyond half marathon distance. Test race preparation and pacing strategy.' },
+                    { id: 'w11-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Peak tempo distance. Build confidence in sustained pace.' },
+                    { id: 'w11-speed', type: 'speed', distance: 6, pace: 'varied', description: '6 km hill repeats or strides', details: 'Hill training or strides:\n• 2km warm-up\n• 8 × 30 second hill repeats OR\n• 6 × 100m strides\n• 2km cool-down\n• Focus on power and form' }
+                ]
+            },
+            12: {
+                title: "Race-Pace Development",
+                workouts: [
+                    { id: 'w12-long', type: 'long', distance: 19, pace: '6:10', description: 'Long Run: 19 km @ 6:10/km (cutback)', details: 'Recovery week before building to peak phase.' },
+                    { id: 'w12-tempo', type: 'tempo', distance: 6, pace: '5:30', description: 'Tempo Run: 6 km @ 5:30/km', details: 'Moderate tempo to maintain fitness while recovering.' },
+                    { id: 'w12-speed', type: 'speed', distance: 3.5, pace: '5:00', description: '4x800m @ 5:00/km', details: '4 × 800m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Total distance: ~3.5km' }
+                ]
+            },
+            13: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w13-long', type: 'long', distance: 28, pace: '6:00', description: 'Long Run: 28 km @ 6:00/km', details: 'Entering peak phase. Practice race pace and fueling every 5km.' },
+                    { id: 'w13-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Strong threshold work. Build lactate buffering capacity.' },
+                    { id: 'w13-speed', type: 'speed', distance: 4, pace: '5:00', description: '4x1 km @ 5:00/km', details: '4 × 1km intervals at 5:00/km pace\n• 2 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Focus on race pace rhythm' }
+                ]
+            },
+            14: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w14-long', type: 'long', distance: 30, pace: '6:00', description: 'Long Run: 30 km @ 6:00/km', details: 'Building to peak distance. Practice race day routine and gear.' },
+                    { id: 'w14-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Sustained tempo effort. Build mental toughness for marathon.' },
+                    { id: 'w14-speed', type: 'speed', distance: 4.5, pace: '5:00', description: '6x800m @ 5:00/km', details: '6 × 800m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Total distance: ~4.5km' }
+                ]
+            },
+            15: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w15-long', type: 'long', distance: 32, pace: '6:00', description: 'Long Run: 32 km @ 6:00/km', details: 'Peak long run distance. Simulate race conditions and practice fueling strategy.' },
+                    { id: 'w15-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Peak tempo distance. Build confidence in sustained pace effort.' },
+                    { id: 'w15-speed', type: 'speed', distance: 6, pace: 'progression', description: '6 km progression (last 2 km @ 4:55/km)', details: 'Progression run:\n• 2km at 6:30/km\n• 2km at 6:00/km\n• 2km at 4:55/km\n• Practice finishing strong' }
+                ]
+            },
+            16: {
+                title: "Endurance Peak Begins",
+                workouts: [
+                    { id: 'w16-long', type: 'long', distance: 24, pace: '6:10', description: 'Long Run: 24 km @ 6:10/km (cutback)', details: 'Recovery week before final peak phase. Easy, relaxed effort.' },
+                    { id: 'w16-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo to maintain fitness while recovering.' },
+                    { id: 'w16-speed', type: 'speed', distance: 5, pace: 'varied', description: '5 km fartlek (1:00 hard / 1:00 easy)', details: 'Fartlek training:\n• 1km warm-up\n• 3km of 1:00 hard / 1:00 easy intervals\n• 1km cool-down\n• Keep efforts controlled' }
+                ]
+            },
+            17: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w17-long', type: 'long', distance: 28, pace: '6:00', description: 'Long Run: 28 km @ 6:00/km', details: 'Peak training run. Practice race pace segments and fueling every 5km.' },
+                    { id: 'w17-tempo', type: 'tempo', distance: 10, pace: '5:30', description: 'Tempo Run: 10 km @ 5:30/km', details: 'Peak tempo distance. Build confidence in sustained marathon pace.' },
+                    { id: 'w17-speed', type: 'speed', distance: 4.5, pace: '5:00', description: '3x1.5 km @ 5:00/km', details: '3 × 1.5km intervals at 5:00/km pace\n• 2.5 minutes jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Focus on race pace rhythm' }
+                ]
+            },
+            18: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w18-long', type: 'long', distance: 30, pace: '6:00', description: 'Long Run: 30 km @ 6:00/km', details: 'Longest training run. Practice everything: pace, fueling, gear, mental strategies.' },
+                    { id: 'w18-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Strong tempo effort. Build confidence for marathon pace segments.' },
+                    { id: 'w18-speed', type: 'speed', distance: 4, pace: '4:45', description: '6x600m @ 4:45/km', details: '6 × 600m intervals at 4:45/km pace\n• 90 seconds jog recovery between intervals\n• 1.5km warm-up, 1.5km cool-down\n• Sharp speed to maintain leg turnover' }
+                ]
+            },
+            19: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w19-long', type: 'long', distance: 32, pace: '6:00', description: 'Long Run: 32 km @ 6:00/km', details: 'Peak long run. Final dress rehearsal - practice everything exactly as race day.' },
+                    { id: 'w19-tempo', type: 'tempo', distance: 10, pace: '5:30', description: 'Tempo Run: 10 km @ 5:30/km', details: 'Final peak tempo. Build ultimate confidence in pace and endurance.' },
+                    { id: 'w19-speed', type: 'speed', distance: 4, pace: 'progression', description: '4 km progression (finish @ 4:55/km)', details: 'Progression run:\n• 1km at 6:00/km\n• 1km at 5:30/km\n• 1km at 5:10/km\n• 1km at 4:55/km\n• Practice strong finish' }
+                ]
+            },
+            20: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w20-long', type: 'long', distance: 23, pace: '6:05', description: 'Long Run: 23 km @ 6:05/km (cutback)', details: 'Begin taper. Relaxed effort, focus on recovery and preparation.' },
+                    { id: 'w20-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Moderate tempo to maintain sharpness without stress.' },
+                    { id: 'w20-speed', type: 'speed', distance: 3, pace: '5:00', description: '5x400m @ 5:00/km', details: '5 × 400m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Keep legs sharp' }
+                ]
+            },
+            21: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w21-long', type: 'long', distance: 26, pace: '6:00', description: 'Long Run: 26 km @ 6:00/km', details: 'Final long run. Practice race pace for middle 20km. Build confidence.' },
+                    { id: 'w21-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Controlled tempo effort. Maintain fitness while allowing recovery.' },
+                    { id: 'w21-speed', type: 'speed', distance: 3, pace: '5:00', description: '3x1 km @ 5:00/km', details: '3 × 1km intervals at 5:00/km pace\n• 2 minutes jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Maintain leg speed' }
+                ]
+            },
+            22: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w22-long', type: 'long', distance: 19, pace: '6:10', description: 'Long Run: 19 km @ 6:10/km', details: 'Reduce distance significantly. Easy, comfortable effort. Focus on feeling fresh.' },
+                    { id: 'w22-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo to maintain race pace feel without fatigue.' },
+                    { id: 'w22-speed', type: 'speed', distance: 2.5, pace: '5:00', description: '4x400m @ 5:00/km', details: '4 × 400m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Keep nervous system sharp' }
+                ]
+            },
+            23: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w23-long', type: 'long', distance: 13, pace: '6:15', description: 'Long Run: 13 km @ 6:15/km', details: 'Short, easy run. Focus on feeling loose and relaxed. Practice race morning routine.' },
+                    { id: 'w23-tempo', type: 'tempo', distance: 5, pace: '5:40', description: 'Tempo Run: 5 km @ 5:40/km', details: 'Short tempo to remind muscles of race pace feel.' },
+                    { id: 'w23-speed', type: 'speed', distance: 3, pace: '5:10', description: '3x800m @ 5:10/km', details: '3 × 800m intervals at 5:10/km pace\n• 2 minutes jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Final sharpening session' }
+                ]
+            },
+            24: {
+                title: "Marathon Specific Work",
+                workouts: [
+                    { id: 'w24-long', type: 'long', distance: 26, pace: '6:05', description: 'Long Run: 26 km @ 6:05/km (cutback)', details: 'Begin taper phase. Relaxed effort, focus on recovery and preparation.' },
+                    { id: 'w24-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Moderate tempo to maintain sharpness without stress.' },
+                    { id: 'w24-speed', type: 'speed', distance: 3, pace: '5:00', description: '5x400m @ 5:00/km', details: '5 × 400m intervals at 5:00/km pace\n• 90 seconds jog recovery between intervals\n• 1km warm-up, 1km cool-down\n• Keep legs sharp' }
+                ]
+            },
+            25: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w25-long', type: 'long', distance: 34, pace: '6:00', description: 'Long Run: 34 km @ 6:00/km', details: 'Peak training distance. Practice race strategy and nutrition timing.' },
+                    { id: 'w25-tempo', type: 'tempo', distance: 11, pace: '5:30', description: 'Tempo Run: 11 km @ 5:30/km', details: 'Longest tempo run. Build ultimate confidence in sustained pace.' },
+                    { id: 'w25-speed', type: 'speed', distance: 5, pace: '5:00', description: '4x1.5 km @ 5:00/km', details: '4 × 1.5km intervals at 5:00/km pace\n• 2.5 minutes jog recovery\n• Focus on race pace rhythm and control' }
+                ]
+            },
+            26: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w26-long', type: 'long', distance: 36, pace: '6:00', description: 'Long Run: 36 km @ 6:00/km', details: 'Longest training run. Simulate race day conditions completely.' },
+                    { id: 'w26-tempo', type: 'tempo', distance: 10, pace: '5:30', description: 'Tempo Run: 10 km @ 5:30/km', details: 'Strong tempo effort. Build confidence for marathon pace segments.' },
+                    { id: 'w26-speed', type: 'speed', distance: 4, pace: '4:45', description: '7x600m @ 4:45/km', details: '7 × 600m intervals at 4:45/km pace\n• 90 seconds jog recovery\n• Maintain leg speed and power' }
+                ]
+            },
+            27: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w27-long', type: 'long', distance: 38, pace: '6:00', description: 'Long Run: 38 km @ 6:00/km', details: 'Peak long run. Final test of endurance and race strategy.' },
+                    { id: 'w27-tempo', type: 'tempo', distance: 12, pace: '5:30', description: 'Tempo Run: 12 km @ 5:30/km', details: 'Peak tempo distance. Ultimate test of sustained pace ability.' },
+                    { id: 'w27-speed', type: 'speed', distance: 4, pace: 'progression', description: '4 km progression (finish @ 4:50/km)', details: 'Progression run:\n• 1km at 6:00/km\n• 1km at 5:30/km\n• 1km at 5:00/km\n• 1km at 4:50/km' }
+                ]
+            },
+            28: {
+                title: "Peak Marathon Training",
+                workouts: [
+                    { id: 'w28-long', type: 'long', distance: 28, pace: '6:05', description: 'Long Run: 28 km @ 6:05/km (cutback)', details: 'Recovery week. Begin tapering while maintaining fitness.' },
+                    { id: 'w28-tempo', type: 'tempo', distance: 8, pace: '5:35', description: 'Tempo Run: 8 km @ 5:35/km', details: 'Moderate tempo to maintain sharpness without fatigue.' },
+                    { id: 'w28-speed', type: 'speed', distance: 3, pace: '5:00', description: '6x400m @ 5:00/km', details: '6 × 400m intervals\n• 90 seconds recovery\n• Keep nervous system sharp' }
+                ]
+            },
+            29: {
+                title: "Early Taper Phase",
+                workouts: [
+                    { id: 'w29-long', type: 'long', distance: 32, pace: '6:00', description: 'Long Run: 32 km @ 6:00/km', details: 'Final peak long run. Practice everything exactly as race day.' },
+                    { id: 'w29-tempo', type: 'tempo', distance: 9, pace: '5:30', description: 'Tempo Run: 9 km @ 5:30/km', details: 'Strong tempo effort. Final confidence builder at threshold pace.' },
+                    { id: 'w29-speed', type: 'speed', distance: 4, pace: '5:00', description: '4x1 km @ 5:00/km', details: '4 × 1km intervals at race pace\n• 2 minutes recovery\n• Practice race rhythm' }
+                ]
+            },
+            30: {
+                title: "Early Taper Phase",
+                workouts: [
+                    { id: 'w30-long', type: 'long', distance: 26, pace: '6:05', description: 'Long Run: 26 km @ 6:05/km', details: 'Begin reducing volume. Maintain quality but allow recovery.' },
+                    { id: 'w30-tempo', type: 'tempo', distance: 7, pace: '5:35', description: 'Tempo Run: 7 km @ 5:35/km', details: 'Moderate tempo effort. Maintain race pace feel.' },
+                    { id: 'w30-speed', type: 'speed', distance: 3, pace: '5:00', description: '5x400m @ 5:00/km', details: '5 × 400m intervals\n• Keep legs sharp but not stressed' }
+                ]
+            },
+            31: {
+                title: "Early Taper Phase",
+                workouts: [
+                    { id: 'w31-long', type: 'long', distance: 28, pace: '6:00', description: 'Long Run: 28 km @ 6:00/km', details: 'Penultimate long run. Practice race segments and fueling.' },
+                    { id: 'w31-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Strong tempo to maintain threshold fitness.' },
+                    { id: 'w31-speed', type: 'speed', distance: 3.5, pace: '5:00', description: '3x1 km @ 5:00/km', details: '3 × 1km at race pace\n• Practice race rhythm and breathing' }
+                ]
+            },
+            32: {
+                title: "Early Taper Phase", 
+                workouts: [
+                    { id: 'w32-long', type: 'long', distance: 22, pace: '6:10', description: 'Long Run: 22 km @ 6:10/km (cutback)', details: 'Recovery week. Allow adaptations while staying active.' },
+                    { id: 'w32-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo. Maintain feel without stress.' },
+                    { id: 'w32-speed', type: 'speed', distance: 2.5, pace: '5:00', description: '4x400m @ 5:00/km', details: 'Short intervals to maintain leg speed' }
+                ]
+            },
+            33: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w33-long', type: 'long', distance: 30, pace: '6:00', description: 'Long Run: 30 km @ 6:00/km', details: 'Final long run. Practice race pace for middle 20km segments.' },
+                    { id: 'w33-tempo', type: 'tempo', distance: 8, pace: '5:30', description: 'Tempo Run: 8 km @ 5:30/km', details: 'Final tempo run. Build ultimate confidence.' },
+                    { id: 'w33-speed', type: 'speed', distance: 3, pace: '5:00', description: '3x1 km @ 5:00/km', details: 'Final race pace work. Perfect your rhythm.' }
+                ]
+            },
+            34: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w34-long', type: 'long', distance: 24, pace: '6:10', description: 'Long Run: 24 km @ 6:10/km', details: 'Significant volume reduction. Easy, comfortable effort.' },
+                    { id: 'w34-tempo', type: 'tempo', distance: 6, pace: '5:35', description: 'Tempo Run: 6 km @ 5:35/km', details: 'Moderate tempo to maintain race pace feel.' },
+                    { id: 'w34-speed', type: 'speed', distance: 2.5, pace: '5:00', description: '4x400m @ 5:00/km', details: 'Keep nervous system sharp with short intervals' }
+                ]
+            },
+            35: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w35-long', type: 'long', distance: 20, pace: '6:15', description: 'Long Run: 20 km @ 6:15/km', details: 'Easy run. Focus on feeling fresh and loose.' },
+                    { id: 'w35-tempo', type: 'tempo', distance: 5, pace: '5:40', description: 'Tempo Run: 5 km @ 5:40/km', details: 'Short tempo to remind muscles of race pace.' },
+                    { id: 'w35-speed', type: 'speed', distance: 3, pace: '5:10', description: '3x800m @ 5:10/km', details: 'Final sharpening. Keep legs responsive.' }
+                ]
+            },
+            36: {
+                title: "Taper Phase",
+                workouts: [
+                    { id: 'w36-long', type: 'long', distance: 16, pace: '6:15', description: 'Long Run: 16 km @ 6:15/km', details: 'Short, easy run. Practice race morning routine.' },
+                    { id: 'w36-tempo', type: 'tempo', distance: 4, pace: '5:40', description: 'Tempo Run: 4 km @ 5:40/km', details: 'Very short tempo. Just touch the pace.' },
+                    { id: 'w36-speed', type: 'speed', distance: 2, pace: 'strides', description: 'Light strides', details: '6 × 100m strides with full recovery' }
+                ]
+            },
+            37: {
+                title: "Final Taper",
+                workouts: [
+                    { id: 'w37-long', type: 'long', distance: 13, pace: '6:20', description: 'Long Run: 13 km @ 6:20/km', details: 'Very easy run. Focus on feeling relaxed and ready.' },
+                    { id: 'w37-tempo', type: 'tempo', distance: 3, pace: '5:45', description: 'Tempo Run: 3 km @ 5:45/km', details: 'Minimal tempo work. Keep legs awake.' },
+                    { id: 'w37-speed', type: 'speed', distance: 2, pace: 'strides', description: '4x200m strides', details: 'Gentle strides to maintain leg turnover' }
+                ]
+            },
+            38: {
+                title: "Final Taper",
+                workouts: [
+                    { id: 'w38-long', type: 'long', distance: 10, pace: '6:30', description: 'Long Run: 10 km @ 6:30/km', details: 'Very short, very easy. Just keep moving.' },
+                    { id: 'w38-tempo', type: 'tempo', distance: 3, pace: '5:45', description: 'Tempo Run: 3 km @ 5:45/km', details: 'Brief tempo reminder.' },
+                    { id: 'w38-speed', type: 'speed', distance: 1.5, pace: 'strides', description: '3x100m strides', details: 'Minimal speed work. Keep legs loose.' }
+                ]
+            },
+            39: {
+                title: "Race Week Preparation",
+                workouts: [
+                    { id: 'w39-long', type: 'long', distance: 8, pace: '6:30', description: 'Long Run: 8 km @ 6:30/km', details: 'Very easy. Practice race week routine.' },
+                    { id: 'w39-tempo', type: 'tempo', distance: 2, pace: '5:45', description: 'Tempo Run: 2 km @ 5:45/km', details: 'Minimal tempo. Just wake up the legs.' },
+                    { id: 'w39-speed', type: 'speed', distance: 1, pace: 'strides', description: '4 x 30 second strides', details: 'Very light activation work.' }
+                ]
+            },
+            40: {
+                title: "Race Week",
+                workouts: [
+                    { id: 'w40-race', type: 'race', distance: 42.2, pace: '5:41', description: 'Marathon: 42.2 km @ 5:41/km', details: 'RACE DAY! Execute your race plan:\n• Start conservatively\n• Fuel every 5km\n• Stay relaxed first half\n• Build gradually second half\n• You are ready!' },
+                    { id: 'w40-tempo', type: 'tempo', distance: 3, pace: '5:40', description: 'Tempo Run: 3 km @ 5:40/km (early week)', details: 'Short tempo early in race week. Just remind legs of pace feel.' },
+                    { id: 'w40-speed', type: 'speed', distance: 2, pace: 'strides', description: 'Light strides', details: 'Easy running with strides:\n• 1km easy warm-up\n• 4 × 20 second strides\n• 1km easy cool-down\n• Keep legs loose and ready' }
+                ]
+            }
+        };
 
-            
+        const weekPhases = {
+            1: "Aerobic Base & Routine Building",
+            5: "Building Strength & Mileage", 
+            9: "Race-Pace Development",
+            13: "Endurance Peak Begins",
+            17: "Marathon Specific Work",
+            25: "Peak Marathon Training",
+            29: "Early Taper Phase",
+            33: "Taper Phase",
+            37: "Final Taper",
+            39: "Race Week Preparation",
+            40: "Race Week"
+        };
+
         const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
         // Save/Load functions for data persistence (localStorage + cookie fallback)
